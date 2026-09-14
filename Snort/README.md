@@ -8,21 +8,19 @@ A practical reference for writing, validating, and testing Snort 2.9 rules in a 
 - [2. Rule Structure](#2-rule-structure)
 - [3. Rule Actions](#3-rule-actions)
 - [4. Protocols](#4-protocols)
-- [5. IP Addresses and Variables](#6-ip-addresses-and-variables)
-- [6. Ports](#7-ports)
-- [7. Traffic Direction](#8-traffic-direction)
-- [9. Rule Options](#9-rule-options)
-- [11. Absolute Search Windows](#11-absolute-search-windows)
-- [12. Relative Search Windows](#12-relative-search-windows)
-- [13. Regular Expressions with `pcre`](#13-regular-expressions-with-pcre)
-- [14. Rule Identification](#14-rule-identification)
-- [15. Configuration and Rule Files](#15-configuration-and-rule-files)
-- [16. Useful Snort Commands](#16-useful-snort-commands)
-- [17. Testing with Netcat](#17-testing-with-netcat)
-- [18. Snort and iptables](#18-snort-and-iptables)
-- [19. Common Mistakes](#19-common-mistakes)
-- [20. Rule Review Checklist](#20-rule-review-checklist)
-- [21. Quick Templates](#21-quick-templates)
+- [5. IP Addresses and Variables](#5-ip-addresses-and-variables)
+- [6. Ports](#6-ports)
+- [7. Traffic Direction](#7-traffic-direction)
+- [8. Rule Options](#8-rule-options)
+- [9. Regular Expressions with `pcre`](#9-regular-expressions-with-pcre)
+- [10. Rule Identification](#10-rule-identification)
+- [11. Configuration and Rule Files](#11-configuration-and-rule-files)
+- [12. Useful Snort Commands](#12-useful-snort-commands)
+- [13. Testing with Netcat](#13-testing-with-netcat)
+- [14. Snort and iptables](#14-snort-and-iptables)
+- [15. Common Mistakes](#15-common-mistakes)
+- [16. Rule Review Checklist](#16-rule-review-checklist)
+- [17. Quick Templates](#17-quick-templates)
 
 ## 1. What is Snort?
 Snort is a network traffic inspection engine that can operate as:
@@ -194,151 +192,71 @@ msg:"Tomcat Manager access detected."
 
 <tr>
 <td>nocase</td>
-<td>`nocase` modifies the preceding `content` and matches values such as:</td>
+<td>`nocase` modifies the preceding `content`. Do not use nocase if content is not present. Matches values such as "metasploit" with:</td>
 <td>
-  <pre>content:"PUT";
-    content:"WEB-INF";
-    content:"metasploit";</pre></td>
-</tr>
-</table>
-
-## 10. Payload Matching with `content`
-
-### Literal content
-
-```snort
-content:"GET /manager/html";
-```
-
-This searches for the exact byte sequence in the inspected payload.
-
-### Multiple content conditions
-
-```snort
-content:"PUT";
-content:"WEB-INF";
-content:"metasploit";
-```
-
-Multiple `content` options in one rule normally represent logical AND:
-
-```text
-PUT must exist
-AND WEB-INF must exist
-AND metasploit must exist
-```
-
-They do not represent alternatives.
-
-### Case-insensitive matching
-
-```snort
-content:"metasploit"; nocase;
-```
-
-`nocase` modifies the preceding `content` and matches values such as:
-
-```text
-metasploit
+  <pre>metasploit
 Metasploit
-METASPLOIT
-```
+METASPLOIT;</pre></td>
+</tr>
 
-Do not use `nocase` without a corresponding `content` option.
+<tr>
+<td>offset</td>
+<td>Specifies the byte from which Snort begins searching:</td>
+<td>
+  <pre>content:"PUT"; offset:0;</pre></td>
+</tr>
 
-## 11. Absolute Search Windows
+<tr>
+<td>depth</td>
+<td>Specifies how many bytes Snort inspects from the offset:</td>
+<td>
+  <pre>content:"PUT"; offset:0; depth:3;</pre></td>
+</tr>
 
-Use `offset` and `depth` when the search window is measured from the beginning of the payload.
+<tr>
+<td>depth</td>
+<td>Specifies how many bytes Snort inspects from the offset. Depth is length, not ending position.</td>
+<td>
+  <pre>content:"PUT"; offset:0; depth:3;</pre></td>
+</tr>
 
-### `offset`
-
-Specifies the byte from which Snort begins searching:
-
-```snort
-content:"PUT"; offset:0;
-```
-
-### `depth`
-
-Specifies how many bytes Snort inspects from the offset:
-
-```snort
-content:"PUT"; offset:0; depth:3;
-```
-
-This requires `PUT` to appear in the first three payload bytes.
-
-### Important rule
-
-`depth` is a length, not an ending byte position.
-
-```snort
-offset:3; depth:256;
-```
-
-This means:
-
-```text
-Start at byte 3 and inspect 256 bytes.
-```
-
-It does not mean that the final position is byte 256.
-
-### Shared absolute window example
-
-```snort
-content:"PUT"; offset:0; depth:3;
+<tr>
+<td></td>
+<td>All three later patterns must appear within the same 256-byte window beginning after `PUT`:</td>
+<td>
+  <pre>content:"PUT"; offset:0; depth:3;
 content:"FIRST"; offset:3; depth:256;
 content:"SECOND"; offset:3; depth:256;
-content:"THIRD"; offset:3; depth:256;
-```
+content:"THIRD"; offset:3; depth:256;</pre></td>
+</tr>
 
-All three later patterns must appear within the same 256-byte window beginning after `PUT`.
+<tr>
+<td>distance</td>
+<td>Specifies how many bytes after the previous content match Snort should begin searching. Begins looking the new content immediately after the end of the first one:</td>
+<td>
+  <pre>content:"ABC";
+content:"XYZ"; distance:0;</pre></td>
+</tr>
 
-## 12. Relative Search Windows
+<tr>
+<td>within</td>
+<td>Limits how far Snort may search after the previous content match. Searches for `XYZ` within 20 bytes after `ABC`. </td>
+<td>
+  <pre>content:"ABC";
+content:"XYZ"; distance:0; within:20;</pre></td>
+</tr>
 
-Use `distance` and `within` when a search is relative to the previous content match.
+<tr>
+<td></td>
+<td><pre>offset + depth      Absolute window from the payload start
+distance + within  Relative window from the previous match</pre> </td>
+<td></td>
+</tr>
 
-### `distance`
+</table>
 
-Specifies how many bytes after the previous content match Snort should begin searching:
 
-```snort
-content:"ABC";
-content:"XYZ"; distance:0;
-```
-
-Snort begins searching for `XYZ` immediately after the end of `ABC`.
-
-### `within`
-
-Limits how far Snort may search after the previous content match:
-
-```snort
-content:"ABC";
-content:"XYZ"; distance:0; within:20;
-```
-
-This searches for `XYZ` within 20 bytes after `ABC`.
-
-### Absolute vs relative modifiers
-
-```text
-offset + depth      Absolute window from the payload start
-distance + within  Relative window from the previous match
-```
-
-### Common pitfall
-
-```snort
-content:"A";
-content:"B"; within:256;
-content:"C"; within:256;
-```
-
-Each `within` is relative to the previous match. This can extend the total search area beyond the first 256 bytes after `A`.
-
-## 13. Regular Expressions with `pcre`
+## 9. Regular Expressions with `pcre`
 
 Use `pcre` for alternatives, line boundaries, repetition, and more flexible patterns.
 
@@ -417,7 +335,7 @@ Use `pcre` when you need:
 - Repetition
 - Variable patterns
 
-## 14. Rule Identification
+## 10. Rule Identification
 
 ### `sid`
 
@@ -453,7 +371,7 @@ rev:2;
 
 The revision is not the number of drafting attempts.
 
-## 15. Configuration and Rule Files
+## 11. Configuration and Rule Files
 
 A simple laboratory structure can use:
 
@@ -479,7 +397,7 @@ var LOCAL_NET 10.5.2.0/24
 alert tcp ...
 ```
 
-## 16. Useful Snort Commands
+## 12. Useful Snort Commands
 
 ### Display the installed version
 
@@ -554,7 +472,7 @@ A rule can validate and still:
 
 Always perform positive and negative traffic tests when possible.
 
-## 17. Testing with Netcat
+## 13. Testing with Netcat
 
 Netcat can simulate clients and services in a controlled laboratory.
 
@@ -604,7 +522,7 @@ nc -u 10.5.1.10 53
 
 Only test systems and networks that you own or are explicitly authorized to assess.
 
-## 18. Snort and iptables
+## 14. Snort and iptables
 
 Snort and iptables serve different purposes:
 
@@ -634,7 +552,7 @@ iptables-restore < /root/iptables-before-snort.rules
 
 Do not use permissive firewall policies on an uncontrolled or production network.
 
-## 19. Common Mistakes
+## 15. Common Mistakes
 
 ### Missing the protocol
 
@@ -714,7 +632,7 @@ Every custom rule should have a unique SID.
 
 A valid rule will not alert if Snort cannot see the relevant traffic. Select the interface through which the packet travels.
 
-## 20. Rule Review Checklist
+## 16. Rule Review Checklist
 
 Before publishing or submitting a rule, verify:
 
@@ -739,7 +657,7 @@ Before publishing or submitting a rule, verify:
 - [ ] A positive test generates an alert.
 - [ ] A negative test does not generate an alert.
 
-## 21. Quick Templates
+## 17. Quick Templates
 
 ### Basic TCP alert
 
